@@ -1,0 +1,6 @@
+{
+  "name": "Aether Motors - 3D Vehicle Configurator & Showroom",
+  "description": "High-performance vehicle showroom featuring an interactive 3D car configurator, test drive scheduling, and real-time financial payment calculator.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
