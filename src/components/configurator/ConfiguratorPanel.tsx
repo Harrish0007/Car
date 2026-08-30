@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   VehicleConfiguration,
   VehicleModel,
@@ -12,6 +12,8 @@ import {
   PerformancePackage,
 } from '../../types/vehicle';
 import { vehicleAudio } from '../../utils/audioSynth';
+import { generateShareUrl, copyToClipboard } from '../../utils/shareUtils';
+import confetti from 'canvas-confetti';
 import {
   Palette,
   Disc,
@@ -30,6 +32,13 @@ import {
   ShieldCheck,
   Flame,
   CircleDot,
+  Copy,
+  CheckCheck,
+  ExternalLink,
+  X,
+  Send,
+  Link,
+  FileText,
 } from 'lucide-react';
 
 interface ConfiguratorPanelProps {
@@ -57,6 +66,12 @@ export const ConfiguratorPanel: React.FC<ConfiguratorPanelProps> = ({
 }) => {
   const [activeTab, setActiveTab] = useState<TabType>('exterior');
   const [showPriceBreakdown, setShowPriceBreakdown] = useState(false);
+  const [showShareModal, setShowShareModal] = useState(false);
+  const [copiedLink, setCopiedLink] = useState(false);
+  const [copiedSpecSheet, setCopiedSpecSheet] = useState(false);
+
+  // Generate shareable URL for the current specification
+  const shareUrl = useMemo(() => generateShareUrl(config), [config]);
 
   // Calculate pricing breakdown
   const activeColor =
@@ -105,10 +120,69 @@ export const ConfiguratorPanel: React.FC<ConfiguratorPanelProps> = ({
     onUpdateConfig({ packageIds: newPackages });
   };
 
+  // Copy share URL to clipboard
+  const handleCopyLink = async () => {
+    vehicleAudio.playSelectBeep();
+    const success = await copyToClipboard(shareUrl);
+    if (success) {
+      setCopiedLink(true);
+      confetti({
+        particleCount: 50,
+        spread: 55,
+        origin: { y: 0.6 },
+      });
+      setTimeout(() => setCopiedLink(false), 2500);
+    }
+  };
+
+  // Copy formatted spec text to clipboard
+  const handleCopySpecSheet = async () => {
+    vehicleAudio.playSelectBeep();
+    const specSheet = [
+      `🏁 ${selectedModel.name} - Bespoke Specification`,
+      `💰 MSRP: $${totalPrice.toLocaleString()}`,
+      `🎨 Exterior: ${activeColor.name} (${config.finishType})`,
+      `🛞 Wheels: ${activeWheel.name} with ${activeWheelFinish.name} Finish`,
+      `🛑 Calipers: ${activeCaliper.name}`,
+      `🪟 Roof: ${activeRoof.name}`,
+      `🛋️ Interior: ${activeInterior.name}`,
+      activePackages.length > 0
+        ? `⚡ Packages: ${activePackages.map(p => p.name).join(', ')}`
+        : null,
+      `🔗 View 3D Build: ${shareUrl}`,
+    ]
+      .filter(Boolean)
+      .join('\n');
+
+    const success = await copyToClipboard(specSheet);
+    if (success) {
+      setCopiedSpecSheet(true);
+      setTimeout(() => setCopiedSpecSheet(false), 2500);
+    }
+  };
+
+  // Trigger Native Web Share API if available
+  const handleNativeShare = async () => {
+    vehicleAudio.playSelectBeep();
+    if (typeof navigator !== 'undefined' && navigator.share) {
+      try {
+        await navigator.share({
+          title: `${selectedModel.name} Custom Build | Aether Motors`,
+          text: `Check out my custom configured ${selectedModel.name} ($${totalPrice.toLocaleString()}) on Aether Motors!`,
+          url: shareUrl,
+        });
+      } catch {
+        // User cancelled or share failed
+      }
+    } else {
+      handleCopyLink();
+    }
+  };
+
   return (
     <div
       id="configurator-panel"
-      className="flex flex-col h-full bg-[#0F0F0F] backdrop-blur-xl border border-white/10 rounded-2xl overflow-hidden shadow-2xl"
+      className="flex flex-col h-full bg-[#0F0F0F] backdrop-blur-xl border border-white/10 rounded-2xl overflow-hidden shadow-2xl relative"
     >
       {/* 1. Top Bar: Model Selector Dropdown & Category */}
       <div className="p-4 border-b border-white/10 bg-[#0A0A0A]">
@@ -118,6 +192,21 @@ export const ConfiguratorPanel: React.FC<ConfiguratorPanelProps> = ({
             <span>Aether Bespoke Studio</span>
           </div>
           <div className="flex items-center gap-1.5">
+            {/* Share Build Button */}
+            <button
+              id="btn-share-build-top"
+              onClick={() => {
+                vehicleAudio.playSelectBeep();
+                setShowShareModal(true);
+              }}
+              title="Share Custom Build"
+              className="flex items-center gap-1 py-1.5 px-2.5 rounded-lg text-xs bg-[#18181B] hover:bg-[#27272A] border border-blue-500/30 text-blue-300 hover:text-white transition-colors"
+            >
+              <Share2 className="w-3.5 h-3.5" />
+              <span className="font-semibold text-[11px]">Share</span>
+            </button>
+
+            {/* Save Configuration Button */}
             <button
               id="btn-save-build-quick"
               onClick={() => {
@@ -823,17 +912,29 @@ export const ConfiguratorPanel: React.FC<ConfiguratorPanelProps> = ({
         )}
 
         {/* Action Buttons */}
-        <div className="grid grid-cols-2 gap-2">
+        <div className="grid grid-cols-3 gap-2">
           <button
             id="btn-open-finance-calculator"
             onClick={() => {
               vehicleAudio.playSelectBeep();
               onOpenCalculator();
             }}
-            className="flex items-center justify-center gap-2 py-3 px-3 rounded-xl bg-[#18181B] hover:bg-[#27272A] border border-white/10 text-white text-xs font-bold transition-all active:scale-[0.98]"
+            className="flex items-center justify-center gap-1.5 py-3 px-2 rounded-xl bg-[#18181B] hover:bg-[#27272A] border border-white/10 text-white text-xs font-bold transition-all active:scale-[0.98]"
           >
             <DollarSign className="w-4 h-4 text-emerald-400" />
-            <span>Finance Calc</span>
+            <span className="truncate">Finance</span>
+          </button>
+
+          <button
+            id="btn-share-build-bottom"
+            onClick={() => {
+              vehicleAudio.playSelectBeep();
+              setShowShareModal(true);
+            }}
+            className="flex items-center justify-center gap-1.5 py-3 px-2 rounded-xl bg-[#18181B] hover:bg-[#27272A] border border-blue-500/30 text-blue-300 hover:text-white text-xs font-bold transition-all active:scale-[0.98]"
+          >
+            <Share2 className="w-4 h-4 text-blue-400" />
+            <span className="truncate">Share</span>
           </button>
 
           <button
@@ -842,13 +943,163 @@ export const ConfiguratorPanel: React.FC<ConfiguratorPanelProps> = ({
               vehicleAudio.playSelectBeep();
               onBookTestDrive();
             }}
-            className="flex items-center justify-center gap-2 py-3 px-3 rounded-xl bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400 text-white text-xs font-extrabold shadow-lg shadow-blue-600/25 transition-all active:scale-[0.98]"
+            className="flex items-center justify-center gap-1.5 py-3 px-2 rounded-xl bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400 text-white text-xs font-extrabold shadow-lg shadow-blue-600/25 transition-all active:scale-[0.98]"
           >
             <Calendar className="w-4 h-4 fill-current" />
-            <span>Book Test Drive</span>
+            <span className="truncate">Book Drive</span>
           </button>
         </div>
       </div>
+
+      {/* ================= SHARE BUILD MODAL OVERLAY ================= */}
+      {showShareModal && (
+        <div
+          id="share-build-modal-backdrop"
+          className="absolute inset-0 z-50 bg-black/85 backdrop-blur-md flex flex-col justify-end sm:justify-center p-4 animate-in fade-in duration-200"
+        >
+          <div
+            id="share-build-modal"
+            className="bg-[#121212] border border-white/15 rounded-2xl p-5 shadow-2xl space-y-4 max-h-[92%] overflow-y-auto"
+          >
+            {/* Modal Header */}
+            <div className="flex items-start justify-between gap-3 border-b border-white/10 pb-3">
+              <div>
+                <div className="text-xs font-mono uppercase tracking-wider text-blue-400 flex items-center gap-1.5">
+                  <Share2 className="w-3.5 h-3.5" />
+                  <span>Share Custom Specification</span>
+                </div>
+                <h3 className="text-lg font-bold text-white font-display mt-0.5">
+                  {selectedModel.name}
+                </h3>
+                <p className="text-xs text-neutral-400 font-mono">
+                  MSRP: ${totalPrice.toLocaleString()} · {config.finishType} finish
+                </p>
+              </div>
+              <button
+                id="btn-close-share-modal"
+                onClick={() => {
+                  vehicleAudio.playSelectBeep();
+                  setShowShareModal(false);
+                }}
+                className="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-neutral-400 hover:text-white transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Custom URL Display & Copy Box */}
+            <div className="space-y-2">
+              <label className="block text-xs font-mono uppercase text-neutral-400">
+                Sharable 3D Configuration Link
+              </label>
+              <div className="flex items-center gap-2 bg-[#0A0A0A] p-1.5 rounded-xl border border-white/10 focus-within:border-blue-500 transition-colors">
+                <div className="pl-2 text-neutral-500">
+                  <Link className="w-4 h-4" />
+                </div>
+                <input
+                  id="input-share-url"
+                  type="text"
+                  readOnly
+                  value={shareUrl}
+                  onClick={e => (e.target as HTMLInputElement).select()}
+                  className="bg-transparent text-xs font-mono text-neutral-200 flex-1 outline-none truncate select-all py-1.5"
+                />
+                <button
+                  id="btn-copy-share-url"
+                  onClick={handleCopyLink}
+                  className={`py-2 px-3 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all shadow-md ${
+                    copiedLink
+                      ? 'bg-emerald-600 text-white'
+                      : 'bg-blue-600 hover:bg-blue-500 text-white shadow-blue-600/20'
+                  }`}
+                >
+                  {copiedLink ? (
+                    <>
+                      <CheckCheck className="w-3.5 h-3.5" />
+                      <span>Copied!</span>
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="w-3.5 h-3.5" />
+                      <span>Copy Link</span>
+                    </>
+                  )}
+                </button>
+              </div>
+              <p className="text-[11px] text-neutral-400">
+                Anyone visiting this URL will automatically load this exact 3D model, paint chemistry, wheel finish, and interior spec.
+              </p>
+            </div>
+
+            {/* Encoded Customization Highlights */}
+            <div className="bg-[#0A0A0A] p-3 rounded-xl border border-white/10 space-y-2">
+              <div className="text-[11px] font-mono uppercase text-neutral-400 tracking-wider">
+                Configured Specs Encoded
+              </div>
+              <div className="grid grid-cols-2 gap-2 text-xs">
+                <div className="flex flex-col">
+                  <span className="text-neutral-500 text-[10px]">Exterior Paint</span>
+                  <span className="text-neutral-200 font-medium truncate">
+                    {activeColor.name} ({config.finishType})
+                  </span>
+                </div>
+                <div className="flex flex-col">
+                  <span className="text-neutral-500 text-[10px]">Wheels</span>
+                  <span className="text-neutral-200 font-medium truncate">
+                    {activeWheel.name} ({activeWheelFinish.name})
+                  </span>
+                </div>
+                <div className="flex flex-col">
+                  <span className="text-neutral-500 text-[10px]">Interior</span>
+                  <span className="text-neutral-200 font-medium truncate">
+                    {activeInterior.name}
+                  </span>
+                </div>
+                <div className="flex flex-col">
+                  <span className="text-neutral-500 text-[10px]">Roof / Aero</span>
+                  <span className="text-neutral-200 font-medium truncate">
+                    {activeRoof.name}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Additional Sharing Actions */}
+            <div className="grid grid-cols-2 gap-2 pt-1">
+              <button
+                id="btn-copy-spec-sheet"
+                onClick={handleCopySpecSheet}
+                className={`py-2.5 px-3 rounded-xl border text-xs font-semibold flex items-center justify-center gap-1.5 transition-all ${
+                  copiedSpecSheet
+                    ? 'border-emerald-500/50 bg-emerald-500/10 text-emerald-300'
+                    : 'border-white/10 bg-[#18181B] hover:bg-[#27272A] text-neutral-200'
+                }`}
+              >
+                {copiedSpecSheet ? (
+                  <>
+                    <CheckCheck className="w-3.5 h-3.5 text-emerald-400" />
+                    <span>Spec Sheet Copied!</span>
+                  </>
+                ) : (
+                  <>
+                    <FileText className="w-3.5 h-3.5 text-neutral-400" />
+                    <span>Copy Build Sheet</span>
+                  </>
+                )}
+              </button>
+
+              <button
+                id="btn-native-share"
+                onClick={handleNativeShare}
+                className="py-2.5 px-3 rounded-xl border border-blue-500/30 bg-blue-500/10 hover:bg-blue-500/20 text-blue-300 text-xs font-semibold flex items-center justify-center gap-1.5 transition-all"
+              >
+                <Send className="w-3.5 h-3.5" />
+                <span>Share via App</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

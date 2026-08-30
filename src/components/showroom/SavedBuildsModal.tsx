@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { SavedBuild, VehicleConfiguration, VehicleModel } from '../../types/vehicle';
 import { vehicleAudio } from '../../utils/audioSynth';
+import { generateShareUrl, copyToClipboard } from '../../utils/shareUtils';
 import {
   Bookmark,
   Share2,
@@ -44,12 +45,14 @@ export const SavedBuildsModal: React.FC<SavedBuildsModalProps> = ({
     setNotes('');
   };
 
-  const handleShare = (build: SavedBuild) => {
+  const handleShare = async (build: SavedBuild) => {
     vehicleAudio.playSelectBeep();
-    const shareUrl = window.location.origin + window.location.pathname + `?model=${build.config.modelId}&color=${build.config.colorId}&wheel=${build.config.wheelId}`;
-    navigator.clipboard?.writeText(shareUrl);
-    setCopiedId(build.id);
-    setTimeout(() => setCopiedId(null), 2000);
+    const shareUrl = generateShareUrl(build.config);
+    const success = await copyToClipboard(shareUrl);
+    if (success) {
+      setCopiedId(build.id);
+      setTimeout(() => setCopiedId(null), 2000);
+    }
   };
 
   const handleDownloadSummary = (build: SavedBuild) => {

@@ -71,17 +71,52 @@ export default function App() {
     if (typeof window !== 'undefined') {
       const params = new URLSearchParams(window.location.search);
       const urlModel = params.get('model');
-      const urlColor = params.get('color');
-      const urlWheel = params.get('wheel');
 
       if (urlModel && VEHICLE_MODELS.some(m => m.id === urlModel)) {
+        const foundModel = VEHICLE_MODELS.find(m => m.id === urlModel)!;
         setSelectedModelId(urlModel);
+
+        const urlColor = params.get('color');
+        const urlFinish = params.get('finish') as any;
+        const urlWheel = params.get('wheel');
+        const urlWheelFinish = params.get('wheelFinish');
+        const urlCaliper = params.get('caliper');
+        const urlAero = params.get('aero');
+        const urlRoof = params.get('roof');
+        const urlInterior = params.get('interior');
+        const urlAmbient = params.get('ambient');
+        const urlPackages = params.get('packages');
+        const urlPreset = params.get('preset') as any;
+
+        const validColor = foundModel.availableColors.some(c => c.id === urlColor) ? urlColor : foundModel.availableColors[0]?.id;
+        const validWheel = foundModel.availableWheels.some(w => w.id === urlWheel) ? urlWheel : foundModel.availableWheels[0]?.id;
+        const wheelObj = foundModel.availableWheels.find(w => w.id === validWheel);
+        const validWheelFinish = wheelObj?.finishes.some(f => f.id === urlWheelFinish) ? urlWheelFinish : wheelObj?.finishes[0]?.id;
+        const validCaliper = foundModel.availableCalipers.some(c => c.id === urlCaliper) ? urlCaliper : foundModel.availableCalipers[0]?.id;
+        const validAero = foundModel.availableAero.some(a => a.id === urlAero) ? urlAero : foundModel.availableAero[0]?.id;
+        const validRoof = foundModel.availableRoofs.some(r => r.id === urlRoof) ? urlRoof : foundModel.availableRoofs[0]?.id;
+        const validInterior = foundModel.availableInteriors.some(i => i.id === urlInterior) ? urlInterior : foundModel.availableInteriors[0]?.id;
+        const intObj = foundModel.availableInteriors.find(i => i.id === validInterior);
+
+        const pkgList = urlPackages ? urlPackages.split(',').filter(pId => foundModel.availablePackages.some(pkg => pkg.id === pId)) : [];
+
         setConfig(prev => ({
           ...prev,
           modelId: urlModel,
-          ...(urlColor ? { colorId: urlColor } : {}),
-          ...(urlWheel ? { wheelId: urlWheel } : {}),
+          ...(validColor ? { colorId: validColor } : {}),
+          ...(urlFinish ? { finishType: urlFinish } : {}),
+          ...(validWheel ? { wheelId: validWheel } : {}),
+          ...(validWheelFinish ? { wheelFinishId: validWheelFinish } : {}),
+          ...(validCaliper ? { caliperColorId: validCaliper } : {}),
+          ...(validAero ? { aeroPackageId: validAero } : {}),
+          ...(validRoof ? { roofId: validRoof } : {}),
+          ...(validInterior ? { interiorId: validInterior } : {}),
+          ambientLightColor: urlAmbient ? `#${urlAmbient.replace('#', '')}` : (intObj?.ambientLightHex || prev.ambientLightColor),
+          packageIds: pkgList,
+          ...(urlPreset ? { studioPreset: urlPreset } : {}),
         }));
+
+        triggerToast(`Loaded bespoke ${foundModel.name} build from link!`);
       }
     }
   }, []);
